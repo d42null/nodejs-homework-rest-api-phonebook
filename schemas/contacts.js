@@ -7,6 +7,8 @@ const addContactSchema = Joi.object({
     .regex(/^\+(?:[0-9] ?){6,14}[0-9]$/)
     .message("Phone number is not valid")
     .required(),
+}).messages({
+  "any.required": `missing required {{#label}} field`,
 });
 const updateContactSchema = Joi.object({
   name: Joi.string(),
