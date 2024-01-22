@@ -41,7 +41,7 @@ const current = async (req, res) => {
 const updateSubscription = async (req, res) => {
   await req.user.updateOne(req.body);
   res.json({
-    user: { email: req.user.email, subscription: req.body.subscription },
+    user: await User.findById(req.user._id, "email subscription -_id"),
   });
 };
 module.exports = {
