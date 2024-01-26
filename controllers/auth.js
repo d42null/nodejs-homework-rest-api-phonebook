@@ -53,6 +53,7 @@ const updateSubscription = async (req, res) => {
   });
 };
 const updateAvatar = async (req, res) => {
+  if(!req.file) throw HttpError(400,"File not found")
   const filename = `${req.user._id}_${req.file.filename}`;
   await (await Jimp.read(req.file.path))
     .resize(250, 250)
