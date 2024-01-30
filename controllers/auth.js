@@ -7,6 +7,8 @@ const jwt = require("jsonwebtoken");
 const fs = require("fs/promises");
 const path = require("path");
 const Jimp = require("jimp");
+const {nanoid}=require("nanoid");
+const sendEmail = require("../utils/sendEmail");
 const avatarsDir = path.join(process.cwd(), "public", "avatars");
 const register = async (req, res) => {
   const { email, password } = req.body;
@@ -17,7 +19,15 @@ const register = async (req, res) => {
     ...req.body,
     password: hashPass,
     avatarURL: gravatar.url(email),
+    verificationToken:nanoid(),
   });
+  await sendEmail({
+    to:email,
+    subject:"Email verification",
+    html:`<a target="_blank" href="${process.env.HOST}/api/users/verify/${newUser.verificationToken}">
+    Click to verify email
+    </a>`
+  })
 
   res.status(201).json({
     user: {
@@ -26,12 +36,32 @@ const register = async (req, res) => {
     },
   });
 };
+const verifyEmail=async(req,res)=>{
+  const user=await User.findOne({verificationToken:req.params.verificationToken});
+  if(!user) throw HttpError(404,"User not found")
+  await user.updateOne({verify:true,verificationToken:null});
+
+  res.json({message:"Verification successful"})
+}
+const resendEmailVerification=async(req,res)=>{
+  const user=await User.findOne({email:req.body.email});
+  if(!user) throw HttpError(404,"User not found");
+  if(user.verify) throw HttpError(400,"Verification has already been passed")
+  await sendEmail({
+    to:user.email,
+    subject:"Email verification",
+    html:`<a target="_blank" href="${process.env.HOST}/api/users/verify/${user.verificationToken}">
+    Click to verify email
+    </a>`
+  })
+  res.json({message:"Verification email sent"})
+}
 const login = async (req, res) => {
   const { email, password } = req.body;
   const user = await User.findOne({ email });
   if (!user || !(await bcryptjs.compare(password, user.password)))
     throw HttpError(401, "Email or password is wrong");
-
+  if(!user.verify ) throw HttpError(401,"Email has not verified")
   const token = jwt.sign({ id: user._id }, process.env.S_KEY, {
     expiresIn: "1h",
   });
@@ -67,6 +97,8 @@ const updateAvatar = async (req, res) => {
 };
 module.exports = {
   register: cntrlErrorDecorator(register),
+  verifyEmail:cntrlErrorDecorator(verifyEmail),
+  resendEmailVerification:cntrlErrorDecorator(resendEmailVerification),
   login: cntrlErrorDecorator(login),
   logout: cntrlErrorDecorator(logout),
   current: cntrlErrorDecorator(current),
